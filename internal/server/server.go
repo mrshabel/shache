@@ -12,23 +12,24 @@ import (
 type Server struct {
 	router     *gin.Engine
 	listenAddr string
-	cache      cache.Cacher[any, any]
+	cache      cache.Cacher[string]
 }
 
 // api errors
 var (
 	ErrNotFound    = errors.New("entry not found")
 	ErrInvalidData = errors.New("data validation error")
+	ErrTTLDuration = errors.New("invalid ttl duration. standard format is: 15s, 10m")
 )
 
 type CacheEntryRequest struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
-	// duration in milliseconds
-	TTL time.Duration `json:"ttl"`
+	// ttl as a duration representation. eg: 15s, 10m, 1hr
+	TTL string `json:"ttl"`
 }
 
-func NewServer[T any](addr string, cache cache.Cacher[any, any]) *Server {
+func NewServer[T any](addr string, cache cache.Cacher[string]) *Server {
 	return &Server{
 		listenAddr: addr,
 		cache:      cache,
@@ -74,9 +75,15 @@ func (s *Server) setEntryHandler(c *gin.Context) {
 		c.JSON(422, gin.H{"message": err.Error()})
 		return
 	}
+	// parse duration
+	ttl, err := time.ParseDuration(entry.TTL)
+	if err != nil {
+		c.JSON(422, gin.H{"message": ErrTTLDuration.Error()})
+		return
+	}
 
 	// set cache entry
-	if ok := s.cache.Put(entry.Key, cache.CacheEntry{Value: entry.Value, TTL: entry.TTL}); ok {
+	if ok := s.cache.Put(entry.Key, cache.CacheEntry{Value: entry.Value, TTL: ttl}); ok {
 		c.JSON(200, gin.H{"message": "Entry updated successfully"})
 		return
 	}
@@ -85,6 +92,8 @@ func (s *Server) setEntryHandler(c *gin.Context) {
 }
 
 func (s *Server) Start() error {
+	s.router = gin.Default()
+
 	// register handlers
 	s.router.GET("/ping", pingHandler)
 	s.router.GET("/entries", s.getEntryHandler)

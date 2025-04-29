@@ -1,16 +1,18 @@
 package cache
 
+import "time"
+
 // K is any type which supports compare operations
 // type K comparable
 
-type Cacher[T comparable, V any] interface {
+type Cacher[T comparable] interface {
 	// Put adds the value to the cache, and returns a boolean to indicate whether the value
 	// already existed or not. Put refreshes the underlying tracking of the cache policy
-	Put(key T, value V) bool
+	Put(key T, value CacheEntry) bool
 
 	// Get returns the value associated with a given key and a boolean to indicate whether
 	// the value was found or not
-	Get(key T) (V, bool)
+	Get(key T) (CacheEntry, bool)
 
 	// Clear resets the underlying cache to its original state
 	Clear()
@@ -21,4 +23,11 @@ type Cacher[T comparable, V any] interface {
 
 	// Capacity returns the maximum allowed elements for the underlying cache
 	Capacity() int
+}
+
+// CacheEntry is a representation of a single cache entry value. It contains the TTL and the value
+// associated with a given key
+type CacheEntry struct {
+	Value any
+	TTL   time.Duration
 }

@@ -1,4 +1,4 @@
-.PHONY: build run test
+.PHONY: build run test serve
 
 build:
 	@go build -o bin/shache
@@ -8,3 +8,6 @@ test:
 
 run: build
 	@echo "running shache..."
+
+serve:
+	@go run ./cmd/api .

@@ -6,11 +6,6 @@ import (
 	"time"
 )
 
-type CacheEntry struct {
-	Value any
-	TTL   time.Duration
-}
-
 // Cache is a concurrent and thread-safe cache which implements the Cacher interface
 type Cache[K comparable] struct {
 	mu       sync.RWMutex
