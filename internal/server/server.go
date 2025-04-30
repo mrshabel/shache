@@ -23,8 +23,8 @@ var (
 )
 
 type CacheEntryRequest struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key   string `json:"key" binding:"required"`
+	Value string `json:"value" binding:"required"`
 	// ttl as a duration representation. eg: 15s, 10m, 1hr
 	TTL string `json:"ttl"`
 }
@@ -71,7 +71,7 @@ func (s *Server) getEntryHandler(c *gin.Context) {
 func (s *Server) setEntryHandler(c *gin.Context) {
 	var entry CacheEntryRequest
 	// bind request data into entry request struct
-	if err := c.Bind(&entry); err != nil {
+	if err := c.ShouldBind(&entry); err != nil {
 		c.JSON(422, gin.H{"message": err.Error()})
 		return
 	}

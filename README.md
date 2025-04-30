@@ -35,4 +35,26 @@ Shache is a lightweight, thread-safe caching service built in Go. It provides a 
 
 The server will start on localhost:8000 by default.
 
+## Usage
+
+1. Interact with the cache via HTTP:
+
+-   Set an entry
+
+```bash
+curl -X POST localhost:8000/entries -H "Content-Type: application/json" -d '{"key":"name", "value":"shabel", "ttl":"30s"}'
+```
+
+-   Retrieve entry with key
+
+```bash
+curl localhost:8000/entries?key=name
+```
+
+## Running Tests
+
+```bash
+make test
+```
+
 ## TODO
