@@ -1,6 +1,9 @@
 package utils
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func AssertEqual[T comparable](t *testing.T, got, want T) {
 	t.Helper()
@@ -34,5 +37,12 @@ func AssertNoError(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatalf("didn't expect an error but had one: %v", err)
+	}
+}
+
+func AssertDeepEqual(t *testing.T, got, want any) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("wanted %v, but got %v", want, got)
 	}
 }

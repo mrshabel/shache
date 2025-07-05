@@ -28,6 +28,22 @@ type Cacher[T comparable] interface {
 // CacheEntry is a representation of a single cache entry value. It contains the TTL and the value
 // associated with a given key
 type CacheEntry struct {
-	Value any
-	TTL   time.Duration
+	Value       any           `json:"value"`
+	TTL         time.Duration `json:"ttl"`
+	AccessCount int           `json:"accessCount"`
+	CreatedAt   time.Time     `json:"createdAt"`
+	ExpiresAt   time.Time     `json:"updatedAt"`
+}
+
+// IsExpired checks if the entry has expired
+func (c *CacheEntry) IsExpired() bool {
+	if c.TTL <= 0 {
+		return false
+	}
+	return c.ExpiresAt.Before(time.Now())
+}
+
+// Visited update the visited statistics of the entry
+func (c *CacheEntry) Visited() {
+	c.AccessCount++
 }
