@@ -79,7 +79,39 @@ func TestDistributedCache(t *testing.T) {
 			utils.AssertNoError(t, err)
 
 			// match values
-			utils.AssertDeepEqual(t, got, &record.Value)
+			utils.AssertDeepEqual(t, got.Value, record.Value.Value)
 		}
+	}
+
+	// start a new server, wait for leader to replicate logs then read log
+	cfg := cache.DistributedCacheConfig{}
+	dataDir, err := os.MkdirTemp("", "distributed_cache_test")
+	utils.AssertNoError(t, err)
+	defer func(dataDir string) {
+		_ = os.RemoveAll(dataDir)
+	}(dataDir)
+
+	// ports: 8100, 8101, 8102
+	cfg.BindAddr = fmt.Sprintf("127.0.0.1:810%v", len(cacheCluster)+1)
+	cfg.NodeID = fmt.Sprintf("node%v", len(cacheCluster)+1)
+	cfg.DataDir = dataDir
+
+	// setup server
+	server, err := cache.NewDistributedCache(cfg)
+	utils.AssertNoError(t, err)
+	defer server.Close()
+
+	err = cacheCluster[0].Join(server.NodeID, server.BindAddr)
+	utils.AssertNoError(t, err)
+	// wait for membership to be gossiped
+	time.Sleep(commitTimeout)
+
+	// read logs
+	for _, record := range records {
+		got, err := server.Get(record.Key)
+		utils.AssertNoError(t, err)
+
+		// match values
+		utils.AssertDeepEqual(t, got.Value, record.Value.Value)
 	}
 }

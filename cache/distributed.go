@@ -48,7 +48,7 @@ type Node struct {
 type NodeStatus struct {
 	Me        Node   `json:"me"`
 	Leader    Node   `json:"leader"`
-	Followers []Node `json:"followers"`
+	Followers []Node `json:"followers,omitempty"`
 }
 
 // KVPair represents a cache key-value pair
@@ -83,9 +83,8 @@ type DistributedCache struct {
 
 	// consensus mechanism
 	raft *raft.Raft
-	// persist store for keeping snapshots
-	raftStore *raftboltdb.BoltStore
-	logger    *log.Logger
+
+	logger *log.Logger
 }
 
 // DistributedCacheConfig is the configuration for the distributed cache
@@ -168,22 +167,28 @@ func (c *DistributedCache) setupRaft() error {
 		return fmt.Errorf("file snapshot store: %w", err)
 	}
 
-	// setup log store and stable store (where raft stores cluster metadata)
-	c.raftStore, err = raftboltdb.New(raftboltdb.Options{
-		Path: filepath.Join(c.DataDir, "raft.db"),
+	// setup log store and stable store (persistence store for cluster metadata)
+	stableStore, err := raftboltdb.New(raftboltdb.Options{
+		Path: filepath.Join(c.DataDir, "stable"),
+	})
+	if err != nil {
+		return fmt.Errorf("raft store: %w", err)
+	}
+	logStore, err := raftboltdb.New(raftboltdb.Options{
+		Path: filepath.Join(c.DataDir, "raft"),
 	})
 	if err != nil {
 		return fmt.Errorf("raft store: %w", err)
 	}
 
 	// instantiate raft
-	c.raft, err = raft.NewRaft(config, fsm, c.raftStore, c.raftStore, snapshots, transport)
+	c.raft, err = raft.NewRaft(config, fsm, logStore, stableStore, snapshots, transport)
 	if err != nil {
 		return fmt.Errorf("new raft: %w", err)
 	}
 
 	// check if server has any existing state
-	hasState, err := raft.HasExistingState(c.raftStore, c.raftStore, snapshots)
+	hasState, err := raft.HasExistingState(logStore, stableStore, snapshots)
 	if err != nil {
 		return err
 	}
@@ -346,6 +351,19 @@ func (c *DistributedCache) Join(nodeID, addr string) error {
 	return nil
 }
 
+// Leave removes the node from the cluster. Calling it on the leader will require and election to begin
+func (c *DistributedCache) Leave() error {
+	c.logger.Println("received leave request on current node")
+
+	future := c.raft.RemoveServer(raft.ServerID(c.NodeID), 0, 0)
+	if err := future.Error(); err != nil {
+		return fmt.Errorf("error removing current node %s at %s: %w", c.NodeID, c.BindAddr, err)
+	}
+
+	c.logger.Printf("node %s at %s removed from cluster successfully", c.NodeID, c.BindAddr)
+	return nil
+}
+
 // Status returns information about the distributed cache through the current node
 func (c *DistributedCache) Status() (*NodeStatus, error) {
 	status := &NodeStatus{}
@@ -374,6 +392,45 @@ func (c *DistributedCache) Status() (*NodeStatus, error) {
 		}
 	}
 	return status, nil
+}
+
+// GetLeaderAddr returns the address of the leader of the cluster
+func (c *DistributedCache) GetLeaderAddr() string {
+	// get leader information
+	leaderAddr, _ := c.raft.LeaderWithID()
+
+	return string(leaderAddr)
+}
+
+// IsLeader checks if the current node is the leader of the cluster
+func (c *DistributedCache) IsLeader() bool {
+	// get leader information
+	leaderAddr, leaderID := c.raft.LeaderWithID()
+
+	// current node
+	nodeID := raft.ServerID(c.NodeID)
+	nodeAddr := raft.ServerAddress(c.BindAddr)
+
+	return leaderAddr == nodeAddr && leaderID == nodeID
+}
+
+// WaitForLeader blocks until the cluster has elected a leader. Useful for test operations where actions go through the leader
+func (c *DistributedCache) WaitForLeader(wait time.Duration) error {
+	timeout := time.After(wait)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// found leader
+			if leader := c.raft.Leader(); leader != "" {
+				return nil
+			}
+		case <-timeout:
+			return fmt.Errorf("timed out while waiting for leader")
+		}
+	}
 }
 
 // Close shuts down the raft cluster

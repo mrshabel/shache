@@ -20,8 +20,8 @@ func TestCache(t *testing.T) {
 
 	// retrieve value
 	val, exists := cache.Get("name")
-	t.Log(val)
 	utils.AssertTrue(t, exists)
+	utils.AssertDeepEqual(t, val.Value, sampleEntry.Value)
 
 	// replace value. should return True
 	exists = cache.Put("name", sampleEntry)
@@ -31,11 +31,11 @@ func TestCache(t *testing.T) {
 	_, exists = cache.Get("age")
 	utils.AssertFalse(t, exists)
 
-	// sleep until ttl entry is evicted
-	time.Sleep(2 * sampleEntry.TTL)
-	val, exists = cache.Get("name")
-	utils.AssertEqual(t, val, CacheEntry{})
-	utils.AssertFalse(t, exists)
+	// DEPRECATED (ttl expiry now happens in a separate component): sleep until ttl entry is evicted
+	// time.Sleep(2 * sampleEntry.TTL)
+	// val, exists = cache.Get("name")
+	// utils.AssertEqual(t, val, CacheEntry{})
+	// utils.AssertFalse(t, exists)
 
 	// clear cache
 	cache.Clear()

@@ -32,7 +32,7 @@ type CacheEntry struct {
 	TTL         time.Duration `json:"ttl"`
 	AccessCount int           `json:"accessCount"`
 	CreatedAt   time.Time     `json:"createdAt"`
-	ExpiresAt   time.Time     `json:"updatedAt"`
+	ExpiresAt   time.Time     `json:"expiresAt"`
 }
 
 // IsExpired checks if the entry has expired

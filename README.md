@@ -1,54 +1,74 @@
 # Shache
 
-Shache is a lightweight, thread-safe caching service built in Go. It provides a simple API for storing, retrieving, and managing cached data with support for TTL (Time-To-Live) expiration. Shache is designed to be fast, scalable, and easy to integrate into your applications with support for different eviction policies such as LRU and LFU. The LFU policy uses the algorithm detailed in this [paper](http://dhruvbird.com/lfu.pdf)
+Shache is a lightweight distributed caching service leveraging RAFT for distributed consensus. It supports ttl-based expiration of keys across the cluster of nodes. Data is stored in memory with additional durability provided via RAFT snapshots.
 
-## Features
+Since RAFT requires an odd number of nodes for a quorum to be reached, it is advisable to spin up an odd number of nodes (3, 5, 7) for optimal performance. Thus, the number of nodes needed to reach consensus are `N/2 + 1` where N is the total number of nodes in the cluster.
 
--   **Thread-Safe**
--   **TTL Support**
--   **RESTful API**: Exposes a simple HTTP API for interacting with the cache.
+## Prerequisites
+
+-   Go 1.23 or higher
+-   Make (for running tests)
 
 ## Installation
 
-1. Clone the repository:
-
-    ```bash
-    git clone https://github.com/mrshabel/shache.git
+```bash
+    git clone https://github.com/mrshabel/shache
     cd shache
-    ```
+```
 
-2. Build the project:
+## Setup
 
-    ```bash
-    make build
-    ```
+Access the setup instruction with:
 
-3. Run the server:
+```bash
+    ./bin/shache -help
+```
 
-    ```bash
-    # production
-    ./bin/shache
+### Single Node
 
-    # development
-    make run
-    ```
+```bash
+    # start production server on port 8000
+    ./bin/shache -node-id=node1 -http-addr=127.0.0.1:8000 -raft-addr=127.0.0.1:8100 -bootstrap=true
+```
 
-The server will start on localhost:8000 by default.
+### Cluster
+
+```bash
+# start leader (node 1)
+./bin/shache -node-id=node1 -http-addr=127.0.0.1:8000 -raft-addr=127.0.0.1:8100 -data-dir=./data -bootstrap=true
+
+# start and join follower to leader (node-2)
+./bin/shache -node-id=node2 -http-addr=127.0.0.1:8001 -raft-addr=127.0.0.1:8101 -data-dir=./data-1 -join=127.0.0.1:8000
+
+# start and join follower to leader (node-3)
+./bin/shache -node-id=node3 -http-addr=127.0.0.1:8002 -raft-addr=127.0.0.1:8102 -data-dir=./data-2 -join=127.0.0.1:8000
+
+```
+
+This sets up a 3-node cluster where the leader bootstraps the cluster.
 
 ## Usage
 
 1. Interact with the cache via HTTP:
 
--   Set an entry
+-   Write an entry to shache via the leader node. The duration is represented with units `s`, `m`, `hr` for seconds, minutes, and hours respectively
 
 ```bash
-curl -X POST localhost:8000/entries -H "Content-Type: application/json" -d '{"key":"name", "value":"shabel", "ttl":"30s"}'
+curl -X POST localhost:8000/cache -H "Content-Type: application/json" -d '{"key":"name", "value":"shabel", "ttl":"5m"}'
 ```
 
--   Retrieve entry with key
+-   Retrieve an entry from shache via any node in the cluster
 
 ```bash
-curl localhost:8000/entries?key=name
+curl localhost:8000/cache?key=name
+```
+
+1. Interact with cluster via HTTP:
+
+-   View cluster status from any node. Information about the leader and all nodes are returned and may be used to explicitly join the cluster
+
+```bash
+curl localhost:8000/status
 ```
 
 ## Running Tests
@@ -57,4 +77,4 @@ curl localhost:8000/entries?key=name
 make test
 ```
 
-## TODO
+This runs unit and integration tests across all components in the shache
