@@ -1,9 +1,7 @@
 package cache
 
 import (
-	"log"
 	"sync"
-	"time"
 )
 
 // Cache is a concurrent and thread-safe cache which implements the Cacher interface
@@ -33,20 +31,20 @@ func (c *Cache[K]) Put(key K, value CacheEntry) bool {
 
 	// setup background goroutine to expire value
 	// TODO: use time buckets to track keys that need to be expired in a particular duration
-	if value.TTL > 0 {
-		go func(key K) {
-			time.Sleep(value.TTL)
-			c.mu.Lock()
-			if _, ok := c.data[key]; !ok {
-				log.Printf("key to be evicted (%v) not found", key)
-				return
-			}
+	// if value.TTL > 0 {
+	// 	go func(key K) {
+	// 		time.Sleep(value.TTL)
+	// 		c.mu.Lock()
+	// 		if _, ok := c.data[key]; !ok {
+	// 			log.Printf("key to be evicted (%v) not found", key)
+	// 			return
+	// 		}
 
-			delete(c.data, key)
-			log.Printf("%v evicted...", key)
-			c.mu.Unlock()
-		}(key)
-	}
+	// 		delete(c.data, key)
+	// 		log.Printf("%v evicted...", key)
+	// 		c.mu.Unlock()
+	// 	}(key)
+	// }
 	return ok
 }
 

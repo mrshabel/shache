@@ -128,8 +128,8 @@ func (t *TTLHandler) invalidateCache() {
 		}
 
 		// remove entry from heap
-		expiredKeys = append(expiredKeys, entry.Key)
-		heap.Pop(t.heap)
+		removed := heap.Pop(t.heap).(*TTLEntry)
+		expiredKeys = append(expiredKeys, removed.Key)
 	}
 	// release lock
 	t.mu.Unlock()

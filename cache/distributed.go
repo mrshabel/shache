@@ -21,7 +21,7 @@ const (
 	RaftTransportPoolSize       = 5
 	RaftMaxSnapshotRetained     = 2
 	cacheCapacity               = 1000
-	DefaultInvalidationInterval = 3 * time.Minute
+	DefaultInvalidationInterval = 30 * time.Second
 )
 
 // request types for the distributed cache
@@ -98,6 +98,8 @@ type DistributedCacheConfig struct {
 	BindAddr string
 	// Bootstrap indicates whether the current node should start the cluster or not. Should be used for first node in the cluster only
 	Bootstrap bool
+	// time interval to perform cache cleanup
+	InvalidationInterval time.Duration
 }
 
 func (cfg *DistributedCacheConfig) validate() error {
@@ -109,6 +111,9 @@ func (cfg *DistributedCacheConfig) validate() error {
 	}
 	if cfg.BindAddr == "" {
 		return fmt.Errorf("BindAddr is required")
+	}
+	if cfg.InvalidationInterval <= 0 {
+		cfg.InvalidationInterval = DefaultInvalidationInterval
 	}
 	return nil
 }
@@ -222,6 +227,11 @@ func (c *DistributedCache) Put(key string, val CacheEntry) error {
 	if _, err := buf.Write([]byte{byte(PutRequestType)}); err != nil {
 		return err
 	}
+
+	// attach default details to cache entry
+	now := time.Now()
+	val.CreatedAt = now
+	val.ExpiresAt = now.Add(val.TTL)
 
 	// marshal record and write to byte buffer
 	b, err := json.Marshal(&KVPair{Key: key, Value: val})
